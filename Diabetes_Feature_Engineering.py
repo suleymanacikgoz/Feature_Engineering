@@ -257,54 +257,159 @@ missing_values_table(df, True)
 #Adım 2: Yeni değişkenler oluşturunuz.
 
 
-# age level
-df.loc[(df['Age'] < 18), 'NEW_AGE_CAT'] = 'young'
-df.loc[(df['Age'] >= 18) & (df['Age'] < 56), 'NEW_AGE_CAT'] = 'mature'
-df.loc[(df['Age'] >= 56), 'NEW_AGE_CAT'] = 'senior'
-# pregnancy x age
-df.loc[(df['Pregnancies'] > 0) & (df['Age'] <= 21), 'NEW_SEX_CAT'] = 'youngfemale'
-df.loc[(df['Pregnancies'] == 0),'NEW_SEX_CAT' ] = 'male'
-df.loc[(df['Pregnancies'] > 0) & (df['Age'] > 21) & (df['Age'] < 50), 'NEW_SEX_CAT'] = 'maturefemale'
-df.loc[(df['Pregnancies'] > 0) & (df['Age'] >= 50), 'NEW_SEX_CAT'] = 'seniorfemale'
+# BMI 18,5 aşağısı underweight, 18.5 ile 24.9 arası normal, 24.9 ile 29.9 arası Overweight ve 30 üstü obez
+df['NEW_BMI'] = pd.cut(x=df['BMI'], bins=[0, 18.5, 24.9, 29.9, 100],labels=["Underweight", "Healthy", "Overweight", "Obese"])
+#literatur taramasından elde ettigimiz degerler.
 
-# weight
-df.loc[(df['BMI'] < 18.5),'NEW_WGHT_CAT'] = 'underweight'
-df.loc[(df['BMI'] >= 18.5) & (df['BMI'] < 24.9),'NEW_WGHT_CAT'] = 'normal'
-df.loc[(df['BMI'] >= 24.9) & (df['BMI'] < 29.9),'NEW_WGHT_CAT'] = 'overweight'
-df.loc[(df['BMI'] >= 29.9) & (df['BMI'] < 34.9),'NEW_WGHT_CAT'] = 'obese'
-df.loc[(df['BMI'] >= 34.9),'NEW_WGHT_CAT'] = 'extremely obese'
+# Glukoz degerini kategorik değişkene çevirme
+df["NEW_GLUCOSE"] = pd.cut(x=df["Glucose"], bins=[0, 140, 200, 300], labels=["Normal", "Prediabetes", "Diabetes"])
 
+# # Yaş ve beden kitle indeksini bir arada düşünerek kategorik değişken oluşturma 3 kırılım yakalandı
+df.loc[(df["BMI"] < 18.5) & ((df["Age"] >= 21) & (df["Age"] < 50)), "NEW_AGE_BMI_NOM"] = "underweightmature"
+df.loc[(df["BMI"] < 18.5) & (df["Age"] >= 50), "NEW_AGE_BMI_NOM"] = "underweightsenior"
+df.loc[((df["BMI"] >= 18.5) & (df["BMI"] < 25)) & ((df["Age"] >= 21) & (df["Age"] < 50)), "NEW_AGE_BMI_NOM"] = "healthymature"
+df.loc[((df["BMI"] >= 18.5) & (df["BMI"] < 25)) & (df["Age"] >= 50), "NEW_AGE_BMI_NOM"] = "healthysenior"
+df.loc[((df["BMI"] >= 25) & (df["BMI"] < 30)) & ((df["Age"] >= 21) & (df["Age"] < 50)), "NEW_AGE_BMI_NOM"] = "overweightmature"
+df.loc[((df["BMI"] >= 25) & (df["BMI"] < 30)) & (df["Age"] >= 50), "NEW_AGE_BMI_NOM"] = "overweightsenior"
+df.loc[(df["BMI"] > 18.5) & ((df["Age"] >= 21) & (df["Age"] < 50)), "NEW_AGE_BMI_NOM"] = "obesemature"
+df.loc[(df["BMI"] > 18.5) & (df["Age"] >= 50), "NEW_AGE_BMI_NOM"] = "obesesenior"
+
+# Yaş ve Glikoz değerlerini bir arada düşünerek kategorik değişken oluşturma
+df.loc[(df["Glucose"] < 70) & ((df["Age"] >= 21) & (df["Age"] < 50)), "NEW_AGE_GLUCOSE_NOM"] = "lowmature"
+df.loc[(df["Glucose"] < 70) & (df["Age"] >= 50), "NEW_AGE_GLUCOSE_NOM"] = "lowsenior"
+df.loc[((df["Glucose"] >= 70) & (df["Glucose"] < 100)) & ((df["Age"] >= 21) & (df["Age"] < 50)), "NEW_AGE_GLUCOSE_NOM"] = "normalmature"
+df.loc[((df["Glucose"] >= 70) & (df["Glucose"] < 100)) & (df["Age"] >= 50), "NEW_AGE_GLUCOSE_NOM"] = "normalsenior"
+df.loc[((df["Glucose"] >= 100) & (df["Glucose"] <= 125)) & ((df["Age"] >= 21) & (df["Age"] < 50)), "NEW_AGE_GLUCOSE_NOM"] = "hiddenmature"
+df.loc[((df["Glucose"] >= 100) & (df["Glucose"] <= 125)) & (df["Age"] >= 50), "NEW_AGE_GLUCOSE_NOM"] = "hiddensenior"
+df.loc[(df["Glucose"] > 125) & ((df["Age"] >= 21) & (df["Age"] < 50)), "NEW_AGE_GLUCOSE_NOM"] = "highmature"
+df.loc[(df["Glucose"] > 125) & (df["Age"] >= 50), "NEW_AGE_GLUCOSE_NOM"] = "highsenior"
 cat_cols, num_cols, cat_but_car = grab_col_names(df)
 
-df["NEW_SEX_CAT"].isnull
-
-#############################################
-# 2. Outliers (Aykırı Değerler)
-#############################################
-
-for col in num_cols:
-    print(col, check_outlier(df, col))
-
-for col in num_cols:
-    replace_with_thresholds(df, col)
-
-for col in num_cols:
-    print(col, check_outlier(df, col))
+# İnsulin Değeri ile Kategorik değişken türetmek
+def set_insulin(dataframe, col_name="Insulin"):
+    if 16 <= dataframe[col_name] <= 166:
+        return "Normal"
+    else:
+        return "Anormal"
 
 
-
-#Adım 3:  Encoding işlemlerini gerçekleştiriniz.
-
-missing_values_table(df)
+df["NEW_INSULIN_SCORE"] = df.apply(set_insulin, axis=1)
 
 
+df["NEW_GLUCOSE*INSULIN"] = df["Glucose"] * df["Insulin"]
+# df["NEW_GLUCOSE*INSULIN_405"] = df["Glucose"] * df["Insulin"] / 405
 
-#Adım 4: Numerik değişkenler için standartlaştırma yapınız.
+# sıfır olan değerler dikkat!!!!
+df["NEW_GLUCOSE*PREGNANCIES"] = df["Glucose"] * df["Pregnancies"]
+#df["NEW_GLUCOSE*PREGNANCIES"] = df["Glucose"] * (1+ df["Pregnancies"])
+
+df.head()
+
+# Kolonların büyültülmesi
+df.columns = [col.upper() for col in df.columns]
+
+df.head()
+
+##################################
+# ENCODING
+##################################
+num_cols
+# Değişkenlerin tiplerine göre ayrılması işlemi
+cat_cols, num_cols, cat_but_car = grab_col_names(df)
+
+# LABEL ENCODING
+def label_encoder(dataframe, binary_col):
+    labelencoder = LabelEncoder()
+    dataframe[binary_col] = labelencoder.fit_transform(dataframe[binary_col])
+    return dataframe
+
+binary_cols = [col for col in df.columns if df[col].dtypes == "O" and df[col].nunique() == 2]
+binary_cols
+
+for col in binary_cols:
+    df = label_encoder(df, col)
+
+df.head()
+
+# One-Hot Encoding İşlemi
+# cat_cols listesinin güncelleme işlemi
+# target değişkenimi cıkarıyorum.
+# bir de binary_cols, zaten daha öncesinde label encoder uygulamıstım.
+cat_cols = [col for col in cat_cols if col not in binary_cols and col not in ["OUTCOME"]]
+cat_cols
+
+def one_hot_encoder(dataframe, categorical_cols, drop_first=False):
+    dataframe = pd.get_dummies(dataframe, columns=categorical_cols, drop_first=drop_first)
+    return dataframe
+
+df = one_hot_encoder(df, cat_cols, drop_first=True)
+
+
+df.head()
+
+##################################
+# STANDARTLAŞTIRMA
+##################################
+
+num_cols
+
+scaler = StandardScaler() # ortalaması sıfır, standart sapması bir olacak sekilde standardize ediyor.
+df[num_cols] = scaler.fit_transform(df[num_cols])
+
+df.head()
+df.shape
+
+df.describe()
+
+##################################
+# MODELLEME
+##################################
+
+# Feature Engineering ardından model basarısını degerlendirelim.
+
+y = df["OUTCOME"]
+X = df.drop("OUTCOME", axis=1)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30, random_state=17)
+
+rf_model = RandomForestClassifier(random_state=46).fit(X_train, y_train)
+y_pred = rf_model.predict(X_test)
+
+print(f"Accuracy: {round(accuracy_score(y_pred, y_test), 2)}")
+print(f"Recall: {round(recall_score(y_pred,y_test),3)}")
+print(f"Precision: {round(precision_score(y_pred,y_test), 2)}")
+print(f"F1: {round(f1_score(y_pred,y_test), 2)}")
+print(f"Auc: {round(roc_auc_score(y_pred,y_test), 2)}")
+
+# Accuracy: 0.79
+# Recall: 0.711
+# Precision: 0.67
+# F1: 0.69
+# Auc: 0.77
+
+# Base Model
+# Accuracy: 0.77
+# Recall: 0.706
+# Precision: 0.59
+# F1: 0.64
+# Auc: 0.75
 
 
 
+##################################
+# FEATURE IMPORTANCE
+##################################
 
-#Adım 5: Model oluşturunuz.
+def plot_importance(model, features, num=len(X), save=False):
+    feature_imp = pd.DataFrame({'Value': model.feature_importances_, 'Feature': features.columns})
+    print(feature_imp.sort_values("Value",ascending=False))
+    plt.figure(figsize=(10, 10))
+    sns.set(font_scale=1)
+    sns.barplot(x="Value", y="Feature", data=feature_imp.sort_values(by="Value",
+                                                                     ascending=False)[0:num])
+    plt.title('Features')
+    plt.tight_layout()
+    plt.show()
+    if save:
+        plt.savefig('importances.png')
 
-
-
+plot_importance(rf_model, X)
